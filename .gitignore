@@ -1,0 +1,14 @@
+__pycache__/
+build/
+dist/
+output/
+settings/
+*.spec
+license.key
+trial.dat
+private_key.hex
+
+# 参照用の大きい素材（アプリ動作には不要）
+IMG_*.jpg
+潜水作業計画A3版(登録可2019_07_19).xlsm
+潜水作業計画A4版.xlsm
