@@ -39,7 +39,7 @@ import win32com.client as win32
 
 import license_core
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 GITHUB_UPDATE_REPO = "openfield-studio/dive-report-generator"
 
 TEMPLATE_NAME = "571d8290bfc37d2165393aa2.xls"
@@ -1091,6 +1091,7 @@ class App:
         ).grid(row=lr, column=1, sticky="w", **pad)
         lr += 1
 
+        lr_times = lr
         make_label(left, "各回の潜降開始時刻（1～4回, カンマ区切り）", lr)
         self.base_times = tk.StringVar(value="08:30,10:30,13:00,15:30")
         ttk.Entry(left, textvariable=self.base_times, width=26).grid(row=lr, column=1, sticky="w", **pad)
@@ -1101,10 +1102,40 @@ class App:
         ttk.Entry(left, textvariable=self.time_jitter, width=6).grid(row=lr, column=1, sticky="w", **pad)
         lr += 1
 
+        lr_depths = lr
         make_label(left, "各回の潜水深度（潜降開始時刻と同じ数, m, カンマ区切り）", lr)
         self.base_depths = tk.StringVar(value="12,9,6,3")
         ttk.Entry(left, textvariable=self.base_depths, width=26).grid(row=lr, column=1, sticky="w", **pad)
         lr += 1
+
+        # 潜降開始時刻と潜水深度の「個数」が一致しているかを線でつないで視覚的に示す
+        self.count_match_canvas = tk.Canvas(left, width=70, highlightthickness=0)
+        self.count_match_canvas.grid(
+            row=lr_times, column=2, rowspan=lr_depths - lr_times + 1, sticky="ns", padx=(2, 8)
+        )
+
+        def _redraw_count_match(*_args):
+            canvas = self.count_match_canvas
+            canvas.delete("all")
+            h = canvas.winfo_height()
+            if h <= 1:
+                h = 90
+            n_times = len([t for t in self.base_times.get().split(",") if t.strip() != ""])
+            n_depths = len([d for d in self.base_depths.get().split(",") if d.strip() != ""])
+            ok = n_times == n_depths and n_times > 0
+            color = "#2a8a2a" if ok else "#cc3333"
+            x = 8
+            canvas.create_line(x, 10, x, h - 10, fill=color, width=2)
+            canvas.create_line(2, 10, x, 10, fill=color, width=2)
+            canvas.create_line(2, h - 10, x, h - 10, fill=color, width=2)
+            mark = "＝" if ok else "≠"
+            canvas.create_text(
+                x + 6, h // 2, text=f"{n_times}{mark}{n_depths}", fill=color, anchor="w", font=("", 9, "bold")
+            )
+
+        self.base_times.trace_add("write", _redraw_count_match)
+        self.base_depths.trace_add("write", _redraw_count_match)
+        self._redraw_count_match = _redraw_count_match
 
         make_label(left, "深度のばらつき（±m）", lr)
         self.depth_jitter = tk.StringVar(value="1")
@@ -1325,6 +1356,7 @@ class App:
         win_h = min(req_h, screen_h - 80)
         root.geometry(f"{win_w}x{win_h}")
 
+        self._redraw_count_match()
         self._check_for_update_async()
 
     def _check_for_update_async(self):
@@ -1466,7 +1498,30 @@ class App:
                 self.equipment_vars[eq_name].set(checked)
         self.status.set(f"「{name}」の設定を読み込みました。")
 
+    def _resolve_dive_count_mismatch(self):
+        """潜降開始時刻と潜水深度の個数が違う場合、少ない方に合わせるかポップアップで確認する。
+        「いいえ」なら生成を中止するため False を返す。"""
+        times = [t.strip() for t in self.base_times.get().split(",") if t.strip() != ""]
+        depths = [d.strip() for d in self.base_depths.get().split(",") if d.strip() != ""]
+        if len(times) == len(depths):
+            return True
+        n = min(len(times), len(depths))
+        if n == 0:
+            return True  # 空欄はcollect_params側の通常のエラー表示に任せる
+        if not messagebox.askyesno(
+            "回数が一致していません",
+            f"潜降開始時刻が{len(times)}個、潜水深度が{len(depths)}個で数が合っていません。\n"
+            f"少ない方（{n}個）に合わせて自動調整しますか？\n"
+            "（「いいえ」の場合は生成を中止します）",
+        ):
+            return False
+        self.base_times.set(",".join(times[:n]))
+        self.base_depths.set(",".join(depths[:n]))
+        return True
+
     def on_generate(self):
+        if not self._resolve_dive_count_mismatch():
+            return
         try:
             params = self.collect_params()
         except Exception as ex:
