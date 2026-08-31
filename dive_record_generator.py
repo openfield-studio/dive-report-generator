@@ -39,7 +39,7 @@ import win32com.client as win32
 
 import license_core
 
-APP_VERSION = "1.1.1"
+APP_VERSION = "1.1.2"
 GITHUB_UPDATE_REPO = "openfield-studio/dive-report-generator"
 
 TEMPLATE_NAME = "571d8290bfc37d2165393aa2.xls"
@@ -559,7 +559,6 @@ def fill_table_section(
 # 5時はラベル("時刻")直後の単独1列（C列=3）、6時以降は3列ブロックの
 # 中央列に数字を中央揃えで置く（実機の罫線パターンから実測して確認済み）。
 _HOUR_ROW = 12        # 時刻軸の行
-_SURFACE_ROW = 13     # 船上(0m)の行
 _DEPTH_COL = 2         # 深度目盛りが入っている列(B)
 _DEPTH_FIRST_ROW = 14  # 深度目盛りの最初の行
 _DEPTH_LAST_ROW = 27   # 深度目盛りの最後の行
@@ -581,7 +580,9 @@ def _build_axis(ws):
         cell = ws.Cells(_HOUR_ROW, col)
         x_by_hour[hour] = cell.Left + cell.Width / 2.0
 
-    y_by_depth = {0.0: ws.Cells(_SURFACE_ROW, _DEPTH_COL).Top}
+    # 0m(船上)の基準線は「船上行の上端」ではなく「深度3mの行の上端（＝船上行の下端）」。
+    # 実機テンプレートに合わせて1行分下げてある。
+    y_by_depth = {0.0: ws.Cells(_DEPTH_FIRST_ROW, _DEPTH_COL).Top}
     for r in range(_DEPTH_FIRST_ROW, _DEPTH_LAST_ROW + 1):
         v = ws.Cells(r, _DEPTH_COL).Value
         if v not in (None, ""):
