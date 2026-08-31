@@ -39,7 +39,7 @@ import win32com.client as win32
 
 import license_core
 
-APP_VERSION = "1.1.2"
+APP_VERSION = "1.1.3"
 GITHUB_UPDATE_REPO = "openfield-studio/dive-report-generator"
 
 TEMPLATE_NAME = "571d8290bfc37d2165393aa2.xls"
@@ -445,7 +445,7 @@ def build_day(plan_date: datetime.date, params: dict, rng: random.Random) -> Div
         start_dts.append(datetime.datetime(2000, 1, 1, hh, mm) + datetime.timedelta(minutes=jitter_min))
 
         depth = base_depths[i] + (rng.randint(-depth_jitter, depth_jitter) if depth_jitter else 0)
-        depths.append(clamp(depth, 1, 40))
+        depths.append(clamp(depth, 3, 40))  # 浅い深度でばらついても最低3mは確保する
 
         bt = base_bt + (rng.randint(-bt_jitter, bt_jitter) if bt_jitter else 0)
         bts.append(clamp(bt, 5, 240))
@@ -492,7 +492,7 @@ def fill_table_section(
             depth_dev = rng.uniform(-depth_deviation_m, depth_deviation_m)
             start_dts.append(e["start_dt"] + datetime.timedelta(minutes=round(e["bt"] * time_frac)))
             bts.append(clamp(round(e["bt"] + bt_dev), 5, 240))
-            depths.append(clamp(round(e["depth"] + depth_dev), 1, 40))
+            depths.append(clamp(round(e["depth"] + depth_dev), 3, 40))  # 浅い深度でばらついても最低3mは確保する
 
         entries = compute_dive_chain(start_dts, depths, bts, no_deco_shallow)
     else:
