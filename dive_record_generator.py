@@ -39,7 +39,7 @@ import win32com.client as win32
 
 import license_core
 
-APP_VERSION = "1.1.3"
+APP_VERSION = "1.1.4"
 GITHUB_UPDATE_REPO = "openfield-studio/dive-report-generator"
 
 TEMPLATE_NAME = "571d8290bfc37d2165393aa2.xls"
@@ -581,12 +581,15 @@ def _build_axis(ws):
         x_by_hour[hour] = cell.Left + cell.Width / 2.0
 
     # 0m(船上)の基準線は「船上行の上端」ではなく「深度3mの行の上端（＝船上行の下端）」。
-    # 実機テンプレートに合わせて1行分下げてある。
+    # 実機テンプレートに合わせて1行分下げてある。3,6,9…の各目盛りも同じ理由で
+    # 「その行の上端」ではなく「その行の下端（＝次の行の上端）」を基準線にする
+    # ことで、0mとの間隔・各目盛り間の間隔をどこも均等（1行分）に保っている。
     y_by_depth = {0.0: ws.Cells(_DEPTH_FIRST_ROW, _DEPTH_COL).Top}
     for r in range(_DEPTH_FIRST_ROW, _DEPTH_LAST_ROW + 1):
-        v = ws.Cells(r, _DEPTH_COL).Value
+        cell = ws.Cells(r, _DEPTH_COL)
+        v = cell.Value
         if v not in (None, ""):
-            y_by_depth[float(v)] = ws.Cells(r, _DEPTH_COL).Top
+            y_by_depth[float(v)] = cell.Top + cell.Height
 
     depths_sorted = sorted(y_by_depth.keys())
     hours_sorted = sorted(x_by_hour.keys())
@@ -694,14 +697,13 @@ def fill_hour_axis(ws):
 
 
 def fix_depth_axis_alignment(ws):
-    """深度目盛り（3,6,9…列B）はテンプレートで下揃え(xlVAlignBottom)になっており、
-    数字が実際の行の上端（＝_build_axisがそのままy座標に使う位置）より
-    行の高さ分（約23pt）下にずれて表示される。これがグラフの水深と数字が
-    ズレて見える原因なので、上揃えに直す。"""
+    """深度目盛り（3,6,9…列B）の基準線は「その行の下端（＝次の行の上端）」
+    なので、数字も行の下揃え(xlVAlignBottom)にして線のすぐ上に来るようにする
+    （テンプレートの既定値も下揃えだが、念のため明示しておく）。"""
     for r in range(_DEPTH_FIRST_ROW, _DEPTH_LAST_ROW + 1):
         cell = ws.Cells(r, _DEPTH_COL)
         if cell.Value not in (None, ""):
-            cell.VerticalAlignment = -4160  # xlVAlignTop
+            cell.VerticalAlignment = -4107  # xlVAlignBottom
 
 
 # 「設備等の点検表」の各項目名と、○/／を書き込むセル位置。
