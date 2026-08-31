@@ -39,7 +39,7 @@ import win32com.client as win32
 
 import license_core
 
-APP_VERSION = "1.1.4"
+APP_VERSION = "1.1.5"
 GITHUB_UPDATE_REPO = "openfield-studio/dive-report-generator"
 
 TEMPLATE_NAME = "571d8290bfc37d2165393aa2.xls"
@@ -902,7 +902,9 @@ def _generate_one_file(excel, out_dir, plan_date, day, plan_rng, params, include
         safe_kouji = _sanitize_filename(kouji)
         name_part = f"{safe_kouji}_" if safe_kouji else ""
         jisshi_part = "実施_" if include_actual_this_file else ""
-        base_name = f"潜水作業計画記録_{jisshi_part}{name_part}{plan_date.strftime('%Y%m%d')}"
+        # 実施ファイルは作業計画日ではなく実施日（作業実施日）をファイル名に使う。
+        file_date = day.exec_date if include_actual_this_file else plan_date
+        base_name = f"潜水作業計画記録_{jisshi_part}{name_part}{file_date.strftime('%Y%m%d')}"
         xls_path = os.path.join(out_dir, base_name + ".xls")
         xlsm_path = os.path.join(out_dir, base_name + ".xlsm")
         pdf_path = os.path.join(out_dir, base_name + ".pdf")
