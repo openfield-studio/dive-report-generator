@@ -39,8 +39,9 @@ import win32com.client as win32
 
 import license_core
 
-APP_VERSION = "1.1.5"
+APP_VERSION = "1.1.7"
 GITHUB_UPDATE_REPO = "openfield-studio/dive-report-generator"
+SUPPORT_EMAIL = "openfield@tnb.bbiq.jp"
 
 TEMPLATE_NAME = "571d8290bfc37d2165393aa2.xls"
 
@@ -938,7 +939,14 @@ def generate(params: dict, progress_cb=None, cancel_check=None):
 
     include_actual = params.get("include_actual", False)
 
-    excel = win32.gencache.EnsureDispatch("Excel.Application")
+    try:
+        excel = win32.gencache.EnsureDispatch("Excel.Application")
+    except Exception as ex:
+        raise RuntimeError(
+            "Excelが見つかりません。このツールで記入例を生成するには、"
+            "このPCにMicrosoft Excelがインストールされている必要があります"
+            "（Excel互換ソフトでは動作しません）。"
+        ) from ex
     excel.Visible = False
     excel.DisplayAlerts = False
     include_saturday = params.get("include_saturday", False)
@@ -1650,6 +1658,23 @@ def _check_saved_license() -> bool:
     return license_core.verify_license_key(machine_id, saved_key)
 
 
+def _open_additional_license_request_email(machine_id: str):
+    """追加ライセンス申請用のメールを、宛先・件名・本文を埋めた状態で作成する
+    （実際の送信はしない。ユーザーのメールソフトの下書き画面が開くだけ）。"""
+    import urllib.parse
+    subject = "潜水作業計画記録ジェネレーター 追加ライセンス申請"
+    body = (
+        "追加のライセンスキーを申請します。\n\n"
+        f"このPCのID: {machine_id}\n"
+        f"アプリのバージョン: {APP_VERSION}\n\n"
+        "（1ライセンスにつき追加は3台まで、2台目以降は手数料がかかります）\n"
+    )
+    url = "mailto:{}?subject={}&body={}".format(
+        SUPPORT_EMAIL, urllib.parse.quote(subject), urllib.parse.quote(body)
+    )
+    webbrowser.open(url)
+
+
 def _show_activation_dialog(root) -> bool:
     """このPC用のライセンスキー入力画面を表示する。認証成功でTrueを返す。"""
     machine_id = license_core.get_machine_id()
@@ -1708,6 +1733,10 @@ def _show_activation_dialog(root) -> bool:
     btn_frame.grid(row=4, column=0, columnspan=3, pady=10)
     tk.Button(btn_frame, text="認証", width=12, command=on_activate).pack(side="left", padx=6)
     tk.Button(btn_frame, text="終了", width=12, command=on_cancel).pack(side="left", padx=6)
+    tk.Button(
+        btn_frame, text="追加ライセンスを申請（メール作成）", width=28,
+        command=lambda: _open_additional_license_request_email(machine_id),
+    ).pack(side="left", padx=6)
 
     dialog.bind("<Return>", lambda e: on_activate())
     dialog.update_idletasks()
